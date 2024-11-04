@@ -1,6 +1,11 @@
 <script lang="ts">
-	import { useQuery, globalLoading, dataCache, invalidateQuery } from '$lib/simple-query.svelte';
-	import { parse } from 'svelte/compiler';
+	import {
+		useQuery,
+		globalLoading,
+		dataCache,
+		queriesCache,
+		invalidateQuery
+	} from '$lib/simple-query.svelte';
 
 	function sleep(ms: number) {
 		return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,11 +22,13 @@
 	}
 
 	let count1 = $state({ num: 11 });
-	let count2 = $state({ num: 16 });
+	let count2 = $state({ num: 11 });
 	let count3 = $state({ num: 21 });
 
 	const useFoo = useQuery(['foo'], async ({ num }: { num: number }) => {
-		await sleep(1000);
+		console.log('actual load fn foo:', num);
+		await sleep(Math.random() * 2000);
+		console.log('actual load fn foo done:', num);
 		return {
 			success: true,
 			data: [num, num + 1, num + 2, formatTime(new Date())]
@@ -31,7 +38,9 @@
 	const useFooKeyed = useQuery(
 		(p: { num: number }) => ['bar', `${p.num}`, 'num'],
 		async ({ num }) => {
+			console.log('actual load fn bar:', num);
 			await sleep(1000);
+			console.log('actual load fn bar done:', num);
 			return {
 				success: true,
 				data: [num, num + 1, num + 2, formatTime(new Date())]
@@ -45,7 +54,8 @@
 
 	let invalidateStr = $state('["bar", "21", "num"]');
 
-	$inspect(dataCache);
+	$inspect('dataCache', dataCache.cache);
+	// $inspect('queriesCache', queriesCache.cache);
 </script>
 
 <div>

@@ -9,15 +9,32 @@ export default function () {
 
 	function setCache(key: string[], value: unknown): void {
 		let current = cache;
+		let i = 0;
 
-		for (const part of key) {
-			if (!(part in current)) {
-				current[part] = {};
-			}
-			current = current[part]!;
+		// Transit down the tree as far as possible on the existing structure
+		while (i < key.length && key[i] in current) {
+			current = current[key[i]]!;
+			i++;
 		}
 
-		current.__value = value;
+		// Construct the missing part of the tree
+		if (i < key.length) {
+			const newBranch: TreeNode<unknown> = {};
+			let temp = newBranch;
+			for (let j = i; j < key.length; j++) {
+				temp[key[j]] = {};
+				temp = temp[key[j]] as TreeNode<unknown>;
+			}
+
+			temp.__value = value; // Attach the final value here
+
+			// Attach the newly created branch to the original object
+			// debugger;
+			current[key[i]] = newBranch[key[i]];
+		} else {
+			// If we traversed the whole path, just set the value
+			current.__value = value;
+		}
 	}
 
 	function getCache(key: string[]): unknown {

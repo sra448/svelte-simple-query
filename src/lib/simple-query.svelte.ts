@@ -26,13 +26,12 @@ function generateCacheFragment(param: Record<string, unknown>) {
 
 // State
 
-export const globalLoading = $state({
-	loading: 0
-});
-
+export const globalLoading = $state({ loading: 0 });
+export const queriesCache = createCache();
+export const loadingCache = createCache();
 export const dataCache = createCache();
 
-const queriesCache = createCache();
+// Actions
 
 export function invalidateQuery(key: string[]) {
 	const queries = queriesCache.getCaches(key);
@@ -43,8 +42,6 @@ export function invalidateQuery(key: string[]) {
 	}
 }
 
-// Actions
-
 export function useQuery<E, P = void, T = unknown>(
 	key: string[] | ((queryParam: P) => string[]),
 	loadFn: (queryParam: P) => Promise<LoadResult<T, E>>,
@@ -52,6 +49,7 @@ export function useQuery<E, P = void, T = unknown>(
 		initialData: T;
 	}
 ) {
+	// const randomKey = Math.random().toString(36).substring(2, 4);
 	const getKey = (queryParam: P) =>
 		typeof key === 'function'
 			? key(queryParam)
@@ -71,12 +69,26 @@ export function useQuery<E, P = void, T = unknown>(
 		});
 
 		$effect(() => {
-			// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-			dataCache.cache;
+			// console.log(
+			// 	randomKey,
+			// 	$state.snapshot(internal.currentKey),
+			// 	'dataCache or currentKey updated'
+			// );
 
 			if (internal.currentKey) {
-				// we set the actual data only when currentKey or data change
 				query.data = dataCache.getCache(internal.currentKey) as T;
+			}
+		});
+
+		$effect(() => {
+			// console.log(
+			// 	randomKey,
+			// 	$state.snapshot(internal.currentKey),
+			// 	'loadingCache or currentKey updated'
+			// );
+
+			if (internal.currentKey) {
+				query.loading = !!loadingCache.getCache(internal.currentKey);
 			}
 		});
 
@@ -84,7 +96,13 @@ export function useQuery<E, P = void, T = unknown>(
 			const cacheKey = getKey(queryParam);
 			internal.currentKey = cacheKey;
 
-			query.loading = true;
+			const alreadyLoading = untrack(() => loadingCache.getCache(cacheKey));
+			if (alreadyLoading) {
+				// console.log(randomKey, cacheKey, 'already loading, skipping');
+				return;
+			}
+
+			untrack(() => loadingCache.setCache(cacheKey, true));
 			untrack(() => globalLoading.loading++);
 
 			query.error = undefined;
@@ -96,7 +114,7 @@ export function useQuery<E, P = void, T = unknown>(
 				query.error = loadResult.error;
 			}
 
-			query.loading = false;
+			untrack(() => loadingCache.removeCache(cacheKey));
 			untrack(() => globalLoading.loading--);
 		};
 
@@ -109,22 +127,31 @@ export function useQuery<E, P = void, T = unknown>(
 	return (queryParam: P) => {
 		const { query, load } = withContext();
 
-		$effect.root(() => {
-			$effect(() => {
-				const currentKey = getKey(queryParam);
-				queriesCache.setCache(currentKey, () => load(queryParam));
-
-				load(queryParam);
-
-				return () => {
-					queriesCache.removeCache(currentKey);
-				};
+		$effect(() => {
+			const currentKey = getKey(queryParam);
+			untrack(() => {
+				// console.log(randomKey, currentKey, 'add load to queriesCache');
+				queriesCache.setCache(currentKey, () => {
+					// console.log(randomKey, currentKey, 'load from cache-invalidation');
+					load(queryParam);
+				});
 			});
+
+			// console.log(randomKey, currentKey, 'effect (calling load)');
+			load(queryParam);
+
+			return () => {
+				// console.log(randomKey, currentKey, 'cleanup');
+				// TOOD: only remove if no other queries are using this key
+				queriesCache.removeCache(currentKey);
+			};
 		});
 
 		return {
 			query,
-			load
+			refetch: () => {
+				load(queryParam);
+			}
 		};
 	};
 }
