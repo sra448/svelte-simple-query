@@ -1,11 +1,5 @@
 <script lang="ts">
-	import {
-		useQuery,
-		globalLoading,
-		dataCache,
-		queriesCache,
-		invalidateQuery
-	} from '$lib/simple-query.svelte';
+	import { useQuery, globalLoading, dataCache, invalidateQuery } from '$lib/simple-query.svelte';
 
 	function sleep(ms: number) {
 		return new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,7 +7,6 @@
 
 	function formatTime(time: Date) {
 		const timeFormat = new Intl.DateTimeFormat('en', {
-			hour: 'numeric',
 			minute: 'numeric',
 			second: 'numeric',
 			hour12: false
@@ -27,7 +20,7 @@
 
 	const useFoo = useQuery(['foo'], async ({ num }: { num: number }) => {
 		console.log('actual load fn foo:', num);
-		await sleep(Math.random() * 2000);
+		await sleep(1000 + Math.random() * 1000);
 		console.log('actual load fn foo done:', num);
 		return {
 			success: true,
@@ -48,24 +41,24 @@
 		}
 	);
 
-	const { query: query1 } = useFoo(count1);
-	const { query: query2 } = useFoo(count2);
-	const { query: query3 } = useFooKeyed(count3);
+	const { query: query1, refetch: refetch1 } = useFoo(count1);
+	const { query: query2, refetch: refetch2 } = useFoo(count2);
+	const { query: query3, refetch: refetch3 } = useFooKeyed(count3);
 
 	let invalidateStr = $state('["bar", "21", "num"]');
 
 	$inspect('dataCache', dataCache.cache);
-	// $inspect('queriesCache', queriesCache.cache);
 </script>
 
 <div>
-	<div>{globalLoading.loading > 0 ? '🐲' : '🦄'}</div>
+	<div>{globalLoading.loading > 0 ? `🐲 Loading (${globalLoading.loading})` : '🦄 Idle'}</div>
 </div>
 
 <div>
 	<div>{count1.num}</div>
 	<button onclick={() => count1.num--}>-</button>
 	<button onclick={() => count1.num++}>+</button>
+	<div><button onclick={refetch1}>♻️</button></div>
 	<div>{query1.loading ? '🐲' : '🦄'}</div>
 	{#each query1.data ?? [] as item}
 		<div>{item}</div>
@@ -76,6 +69,7 @@
 	<div>{count2.num}</div>
 	<button onclick={() => count2.num--}>-</button>
 	<button onclick={() => count2.num++}>+</button>
+	<div><button onclick={refetch2}>♻️</button></div>
 	<div>{query2.loading ? '🐲' : '🦄'}</div>
 	{#each query2.data ?? [] as item}
 		<div>{item}</div>
@@ -86,6 +80,7 @@
 	<div>{count3.num}</div>
 	<button onclick={() => count3.num--}>-</button>
 	<button onclick={() => count3.num++}>+</button>
+	<div><button onclick={refetch3}>♻️</button></div>
 	<div>{query3.loading ? '🐲' : '🦄'}</div>
 	{#each query3.data ?? [] as item}
 		<div>{item}</div>
