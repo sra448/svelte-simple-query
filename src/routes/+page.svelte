@@ -51,7 +51,9 @@
 </script>
 
 <div>
-	<div>{globalLoading.loading > 0 ? `🐲 Loading (${globalLoading.loading})` : '🦄 Idle'}</div>
+	<div>
+		{globalLoading.loadingCount > 0 ? `🐲 Loading (${globalLoading.loadingCount})` : '🦄 Idle'}
+	</div>
 </div>
 
 <div>

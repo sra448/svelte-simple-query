@@ -34,7 +34,7 @@ function generateKey<T>(baseKey: string[] | ((params: T) => string[]), queryPara
 
 // State
 
-export const globalLoading = $state({ loading: 0 });
+export const globalLoading = $state({ loadingCount: 0 });
 export const queriesCache = createCache();
 export const loadingCache = createCache();
 export const dataCache = createCache();
@@ -89,8 +89,10 @@ export function useQuery<E, P = void, T = unknown>(
 				return;
 			}
 
-			untrack(() => loadingCache.setCache(cacheKey, true));
-			untrack(() => globalLoading.loading++);
+			untrack(() => {
+				loadingCache.setCache(cacheKey, true);
+				globalLoading.loadingCount++;
+			});
 
 			query.error = undefined;
 			const loadResult = await loadFn(queryParam);
@@ -101,8 +103,10 @@ export function useQuery<E, P = void, T = unknown>(
 				query.error = loadResult.error;
 			}
 
-			untrack(() => loadingCache.removeCache(cacheKey));
-			untrack(() => globalLoading.loading--);
+			untrack(() => {
+				loadingCache.removeCache(cacheKey);
+				globalLoading.loadingCount--;
+			});
 		};
 
 		return {
@@ -116,10 +120,8 @@ export function useQuery<E, P = void, T = unknown>(
 
 		$effect(() => {
 			const currentKey = generateKey(key, queryParam);
-			untrack(() => {
-				queriesCache.setCache(currentKey, () => {
-					load(queryParam);
-				});
+			queriesCache.setCache(currentKey, () => {
+				load(queryParam);
 			});
 
 			load(queryParam);
@@ -129,14 +131,16 @@ export function useQuery<E, P = void, T = unknown>(
 			};
 		});
 
+		const refetch = () => {
+			const query = queriesCache.getCache(generateKey(key, queryParam));
+			if (query && typeof query === 'function') {
+				query();
+			}
+		};
+
 		return {
 			query,
-			refetch: () => {
-				const query = queriesCache.getCache(generateKey(key, queryParam));
-				if (query && typeof query === 'function') {
-					query();
-				}
-			}
+			refetch
 		};
 	};
 }
