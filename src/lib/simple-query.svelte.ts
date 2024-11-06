@@ -35,9 +35,10 @@ function generateKey<T>(baseKey: string[] | ((params: T) => string[]), queryPara
 // State
 
 export const globalLoading = $state({ loadingCount: 0 });
-export const queriesCache = createCache();
-export const loadingCache = createCache();
-export const dataCache = createCache();
+export const queriesCache = createCache('querie-caches');
+export const loadingCache = createCache('loading-cache');
+export const errorCache = createCache('error-cache');
+export const dataCache = createCache('data-cache');
 
 // Actions
 
@@ -57,7 +58,7 @@ export function useQuery<E, P = void, T = unknown>(
 		initialData: T;
 	}
 ) {
-	const withContext = () => {
+	const createState = () => {
 		const internal = $state({
 			currentKey: undefined as string[] | undefined
 		});
@@ -80,54 +81,65 @@ export function useQuery<E, P = void, T = unknown>(
 			}
 		});
 
-		const load = async (queryParam: P) => {
-			const cacheKey = generateKey(key, queryParam);
-			internal.currentKey = cacheKey;
-
-			const alreadyLoading = untrack(() => loadingCache.getCache(cacheKey));
-			if (alreadyLoading) {
-				return;
+		$effect(() => {
+			if (internal.currentKey) {
+				query.error = errorCache.getCache(internal.currentKey) as E | undefined;
 			}
-
-			untrack(() => {
-				loadingCache.setCache(cacheKey, true);
-				globalLoading.loadingCount++;
-			});
-
-			query.error = undefined;
-			const loadResult = await loadFn(queryParam);
-
-			if (loadResult.success) {
-				dataCache.setCache(cacheKey, loadResult.data);
-			} else {
-				query.error = loadResult.error;
-			}
-
-			untrack(() => {
-				loadingCache.removeCache(cacheKey);
-				globalLoading.loadingCount--;
-			});
-		};
+		});
 
 		return {
-			query,
-			load
+			internal,
+			query
 		};
 	};
 
+	const load = async (queryParam: P) => {
+		const cacheKey = generateKey(key, queryParam);
+
+		const alreadyLoading = untrack(() => loadingCache.getCache(cacheKey));
+		if (alreadyLoading) {
+			return;
+		}
+
+		untrack(() => {
+			loadingCache.setCache(cacheKey, true);
+			errorCache.removeCache(cacheKey);
+			globalLoading.loadingCount++;
+		});
+
+		const loadResult = await loadFn(queryParam);
+		if (loadResult.success) {
+			dataCache.setCache(cacheKey, loadResult.data);
+		} else {
+			errorCache.setCache(cacheKey, loadResult.error);
+		}
+
+		untrack(() => {
+			loadingCache.removeCache(cacheKey);
+			globalLoading.loadingCount--;
+		});
+	};
+
 	return (queryParam: P) => {
-		const { query, load } = withContext();
+		const { internal, query } = createState();
 
 		$effect(() => {
-			const currentKey = generateKey(key, queryParam);
-			queriesCache.setCache(currentKey, () => {
-				load(queryParam);
+			const cacheKey = generateKey(key, queryParam);
+			internal.currentKey = cacheKey;
+
+			untrack(() => {
+				const frozenQueryParam = $state.snapshot(queryParam) as P;
+				queriesCache.setCache(cacheKey, () => {
+					load(frozenQueryParam);
+				});
 			});
 
 			load(queryParam);
 
 			return () => {
-				queriesCache.removeCache(currentKey);
+				untrack(() => {
+					queriesCache.removeCache(cacheKey);
+				});
 			};
 		});
 
