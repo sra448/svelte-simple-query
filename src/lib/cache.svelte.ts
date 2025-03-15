@@ -1,16 +1,28 @@
 import { untrack } from 'svelte';
 
 type TreeNode<T> = {
-	__refCount?: number;
 	__value?: T;
+	__refCount?: number;
+	__timestamp?: number;
 } & {
 	[K in Exclude<string, '__value'>]?: TreeNode<T>;
 };
 
+/**
+ * Create a nested cache object, where the key represents a path to a value.
+ * @param name The name of the cache (for debugging).
+ * @returns The cache object.
+ */
 export default function (name: string = 'cache') {
 	const cache: TreeNode<unknown> = $state({});
 
-	function setCache(key: string[], value: unknown): void {
+	/**
+	 * Set a value in the cache.
+	 * @param key The path of the value.
+	 * @param value The value
+	 * @returns void
+	 */
+	function setValue(key: string[], value: unknown): void {
 		let current = cache;
 		let i = 0;
 
@@ -29,6 +41,7 @@ export default function (name: string = 'cache') {
 
 			temp.__refCount = 1;
 			temp.__value = value;
+			temp.__timestamp = Date.now();
 
 			current[key[i]] = newBranch[key[i]];
 		} else {
@@ -39,7 +52,12 @@ export default function (name: string = 'cache') {
 		}
 	}
 
-	function getCache(key: string[]): unknown {
+	/**
+	 * Get a value from the cache.
+	 * @param key The path of the value.
+	 * @returns The value, or undefined if not found.
+	 */
+	function getValue(key: string[]): unknown {
 		let current = cache;
 
 		for (const part of key) {
@@ -52,7 +70,13 @@ export default function (name: string = 'cache') {
 		return current.__value;
 	}
 
-	function removeCache(key: string[], force = false): void {
+	/**
+	 * Remove a value from the cache.
+	 * @param key The path of the value.
+	 * @param force If true, the value will be removed even if it has a refCount.
+	 * @returns void
+	 */
+	function removeValue(key: string[], force = false): void {
 		console.log(name, key, '💾 remove cache');
 		let current = cache;
 
@@ -76,7 +100,12 @@ export default function (name: string = 'cache') {
 		}
 	}
 
-	function getCaches(key: string[]): unknown[] {
+	/**
+	 * Get the values of all values from the path and below.
+	 * @param key The root path of the values.
+	 * @returns The values.
+	 */
+	function getValues(key: string[]): unknown[] {
 		let current = cache;
 
 		for (const part of key) {
@@ -109,9 +138,9 @@ export default function (name: string = 'cache') {
 
 	return {
 		cache,
-		setCache,
-		getCache,
-		getCaches,
-		removeCache
+		setValue,
+		getValue,
+		getValues,
+		removeValue
 	};
 }

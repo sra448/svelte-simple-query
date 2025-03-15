@@ -42,8 +42,14 @@ export const dataCache = createCache('data-cache');
 
 // Actions
 
+/**
+ * Invalidates queries hierarchically by key.
+ * Invalidating makes queries reload, if they are currently loaded
+ *
+ * @param key The path of the query to invalidate.
+ */
 export function invalidateQuery(key: string[]) {
-	const queries = queriesCache.getCaches(key);
+	const queries = queriesCache.getValues(key);
 	for (const query of queries) {
 		if (query && typeof query === 'function') {
 			query();
@@ -51,6 +57,13 @@ export function invalidateQuery(key: string[]) {
 	}
 }
 
+/**
+ * Creates a query function that can be used to load data.
+ * @param key The path of the query
+ * @param loadFn The function to load the data
+ * @param options The options
+ * @returns A function to create the query
+ */
 export function useQuery<E, P = void, T = unknown>(
 	key: string[] | ((queryParam: P) => string[]),
 	loadFn: (queryParam: P) => Promise<LoadResult<T, E>>,
@@ -71,19 +84,19 @@ export function useQuery<E, P = void, T = unknown>(
 
 		$effect(() => {
 			if (internal.currentKey) {
-				query.data = dataCache.getCache(internal.currentKey) as T;
+				query.data = dataCache.getValue(internal.currentKey) as T;
 			}
 		});
 
 		$effect(() => {
 			if (internal.currentKey) {
-				query.loading = !!loadingCache.getCache(internal.currentKey);
+				query.loading = !!loadingCache.getValue(internal.currentKey);
 			}
 		});
 
 		$effect(() => {
 			if (internal.currentKey) {
-				query.error = errorCache.getCache(internal.currentKey) as E | undefined;
+				query.error = errorCache.getValue(internal.currentKey) as E | undefined;
 			}
 		});
 
@@ -96,26 +109,26 @@ export function useQuery<E, P = void, T = unknown>(
 	const load = async (queryParam: P) => {
 		const cacheKey = generateKey(key, queryParam);
 
-		const alreadyLoading = untrack(() => loadingCache.getCache(cacheKey));
+		const alreadyLoading = untrack(() => loadingCache.getValue(cacheKey));
 		if (alreadyLoading) {
 			return;
 		}
 
 		untrack(() => {
-			loadingCache.setCache(cacheKey, true);
-			errorCache.removeCache(cacheKey);
+			loadingCache.setValue(cacheKey, true);
+			errorCache.removeValue(cacheKey);
 			globalLoading.loadingCount++;
 		});
 
 		const loadResult = await loadFn(queryParam);
 		if (loadResult.success) {
-			dataCache.setCache(cacheKey, loadResult.data);
+			dataCache.setValue(cacheKey, loadResult.data);
 		} else {
-			errorCache.setCache(cacheKey, loadResult.error);
+			errorCache.setValue(cacheKey, loadResult.error);
 		}
 
 		untrack(() => {
-			loadingCache.removeCache(cacheKey);
+			loadingCache.removeValue(cacheKey);
 			globalLoading.loadingCount--;
 		});
 	};
@@ -129,7 +142,7 @@ export function useQuery<E, P = void, T = unknown>(
 
 			untrack(() => {
 				const frozenQueryParam = $state.snapshot(queryParam) as P;
-				queriesCache.setCache(cacheKey, () => {
+				queriesCache.setValue(cacheKey, () => {
 					load(frozenQueryParam);
 				});
 			});
@@ -138,13 +151,13 @@ export function useQuery<E, P = void, T = unknown>(
 
 			return () => {
 				untrack(() => {
-					queriesCache.removeCache(cacheKey);
+					queriesCache.removeValue(cacheKey);
 				});
 			};
 		});
 
 		const refetch = () => {
-			const query = queriesCache.getCache(generateKey(key, queryParam));
+			const query = queriesCache.getValue(generateKey(key, queryParam));
 			if (query && typeof query === 'function') {
 				query();
 			}
