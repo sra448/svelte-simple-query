@@ -56,3 +56,4 @@ It is an asynchronous function that takes one argument and returns a promise of 
 
 Once you created a query, its time to use it. Invoke it and you get access to its loadingstate, data and errors. It will load right away, but if you want to manually trigger a reload down the line, you can use the refetch function, which is also provided.
 
+If you

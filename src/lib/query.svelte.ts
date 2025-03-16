@@ -1,19 +1,6 @@
 import { untrack } from 'svelte';
 import createCache from './cache.svelte';
-
-// Types
-
-type LoadSuccess<T> = {
-	success: true;
-	data: T;
-};
-
-type LoadFailure<E> = {
-	success: false;
-	error: E;
-};
-
-type LoadResult<T, E> = LoadSuccess<T> | LoadFailure<E>;
+import type { LoadResult } from './loadResult';
 
 // Helpers
 
@@ -68,7 +55,7 @@ export function useQuery<E, P = void, T = unknown>(
 	key: string[] | ((queryParam: P) => string[]),
 	loadFn: (queryParam: P) => Promise<LoadResult<T, E>>,
 	options?: {
-		initialData: T;
+		initialData?: T;
 	}
 ) {
 	const createState = () => {

@@ -1,113 +1,88 @@
 <script lang="ts">
-	import {
-		useQuery,
-		globalLoading,
-		dataCache,
-		errorCache,
-		invalidateQuery
-	} from '$lib/query.svelte';
-
-	function sleep(ms: number) {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	function formatTime(time: Date) {
-		const timeFormat = new Intl.DateTimeFormat('en', {
-			minute: 'numeric',
-			second: 'numeric',
-			hour12: false
-		});
-		return timeFormat.format(time);
-	}
-
-	let interrupted = $state(false);
-	let count1 = $state({ num: 11 });
-	let count2 = $state({ num: 11 });
-
-	const useFoo = useQuery(['foo'], async ({ num }: { num: number }) => {
-		console.log('loading query', num);
-		await sleep(500 + Math.random() * 1000);
-		console.log('loading query done', num);
-		if (interrupted) {
-			return { success: false, error: 'interrupted' };
-		}
-
-		return {
-			success: true,
-			data: [num, num + 1, num + 2, formatTime(new Date())]
-		};
-	});
-
-	const { query: query1, refetch: refetch1 } = useFoo(count1);
-	const { query: query2, refetch: refetch2 } = useFoo(count2);
-
-	let invalidateStr = $state('["bar", "21", "num"]');
-
-	$inspect('errorCache', errorCache.cache);
-	$inspect('dataCache', dataCache.cache);
+	import Code from '$lib/examples/components/Code.svelte';
 </script>
 
-<div>
-	<div>
-		{globalLoading.loadingCount > 0 ? `🐲 Loading (${globalLoading.loadingCount})` : '🦄 Idle'}
-	</div>
+<main>
+	<h1>Svelte Simple Query</h1>
 
-	<label>
-		<input type="checkbox" bind:checked={interrupted} /> sabotage 🤡
-	</label>
-</div>
+	<p>
+		Svelte Simple Query is a small svelte library that helps simplify caching loaded data by
+		allowing you to declaratively define queries and then use them in your components.
+	</p>
 
-<div>
-	<div>{count1.num}</div>
-	<button onclick={() => count1.num--}>-</button>
-	<button onclick={() => count1.num++}>+</button>
-	<div><button onclick={refetch1}>♻️</button></div>
-	<div>{query1.loading ? '🐲' : '🦄'}</div>
-	{#if query1.error}
-		<div title={query1.error}>💥</div>
-	{/if}
-	{#each query1.data ?? [] as item}
-		<div>{item}</div>
-	{/each}
-</div>
+	<section>
+		<div>
+			<h2>Queries</h2>
 
-<div>
-	<div>{count2.num}</div>
-	<button onclick={() => count2.num--}>-</button>
-	<button onclick={() => count2.num++}>+</button>
-	<div><button onclick={refetch2}>♻️</button></div>
-	<div>{query2.loading ? '🐲' : '🦄'}</div>
-	{#if query1.error}
-		<div title={query1.error}>💥</div>
-	{/if}
-	{#each query2.data ?? [] as item}
-		<div>{item}</div>
-	{/each}
-</div>
+			<p>
+				A query is a simple abstraction that represents a piece of data, its loading function and a
+				key that identifies the whole unit.
+			</p>
 
-<div>
-	<input type="text" bind:value={invalidateStr} />
-	<button
-		type="button"
-		onclick={() => {
-			invalidateQuery(JSON.parse(invalidateStr));
-		}}
-	>
-		invalidate
-	</button>
-</div>
+			<p>
+				The query takes care of loading the data and caching it. It makes available the loading
+				state, the data, and any error that occurred during loading and a function to manually
+				reload the data.
+			</p>
+
+			<p>
+				Queries are created using the <code>useQuery</code> function. This function takes a key and a
+				function that loads the data. The key is used to identify the query and the data it loads. The
+				loading function is called whenever the query is invalidated.
+			</p>
+		</div>
+		<div>
+			<Code
+				content={`
+import { useQuery, succeed, fail } from 'svelte-simple-query';
+
+const useFriends = useQuery(
+  ['friends'],
+  async () => {
+	  try {
+			const data = await fetchFriends();
+			return succeed(data);
+		} catch (error) {
+			return fail(error);
+		}
+  }
+);
+
+const { query } = useFriends();`}
+			/>
+		</div>
+	</section>
+
+	<section>
+		<div>
+			<h2>Invalidating</h2>
+		</div>
+	</section>
+</main>
+
+<!-- <QueryExample /> -->
 
 <style>
-	div {
-		font-family: monospace;
+	main {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		flex-direction: column;
+		gap: 2rem;
+		max-width: 1000px;
+		margin: 0 auto;
+		font-size: 1.25rem;
 	}
 
-	button {
-		border: none;
-		background-color: none;
-		border-radius: 0.25rem;
+	section {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2rem;
+	}
+
+	section > div {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 1rem;
+		overflow-x: auto;
 	}
 </style>
